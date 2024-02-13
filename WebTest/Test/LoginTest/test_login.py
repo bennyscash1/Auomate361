@@ -17,9 +17,7 @@ class TestLoginWeb(WebDriverFactory):
         self.web_password = GetData.loaded_data[VarData.WebPassword]
 
 
-    # @pytest.mark.allure.feature("Login")
-    # @pytest.mark.allure.story("Web Login")
-    # @pytest.mark.parametrize("category", [("UiWeb"), ("Level_1")])
+    @pytest.mark.webtest    
     def test_login_web(self):
         login_flow = LoginFlow(self.driver)
         xx = self.url
@@ -32,6 +30,7 @@ class TestLoginWeb(WebDriverFactory):
 
     def teardown_method(self):
         self.driver.quit()
+@pytest.mark.webtest
 def test_login():
     run_test = TestLoginWeb()
     run_test.test_login_web()
