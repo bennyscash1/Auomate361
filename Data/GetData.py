@@ -2,6 +2,8 @@ import json
 import os
 from enum import Enum
 
+import pymongo
+
 class VarData(Enum):
     URL1 = "URL1"
     URL2 = "URL2"
@@ -19,9 +21,14 @@ class VarData(Enum):
 
 env= 'dev'
 script_directory = os.path.dirname(os.path.abspath(__file__))
-file_path = os.path.join(script_directory, f'jsonData.{env}.json')
-with open(file_path, 'r') as file:
-    data = json.load(file)
+client = pymongo.MongoClient('mongodb://localhost:27017/')
+db = client['mydatabase']  # Replace 'mydatabase' with your database name
+collection = db['config']  # Create or get collection named 'config'
+data = collection.find_one()
+
+# file_path = os.path.join(script_directory, f'../jsonData.{env}.json')
+# with open(file_path, 'r') as file:
+#     data = json.load(file)
 
 
 loaded_data = {}
