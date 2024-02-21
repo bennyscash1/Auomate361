@@ -34,13 +34,25 @@ data = {
 }
 
 # Connect to MongoDB server
+# client = pymongo.MongoClient('mongodb://localhost:27017/')
+# db = client['mydatabase']  # Replace 'mydatabase' with your database name
+# collection = db['config']  # Create or get collection named 'config'
+
+# # Insert data into the collection
+# collection.insert_one(data)
+
+# # Retrieve data from the collection
+# result = collection.find_one()
+# print(result)
+formatted_test = {
+            'testName': 'bati',
+            'testType': 'get',
+            'endpoint': 'users',
+            'expectedStatus': '200',
+            'expectedData': {'page' : '1'},
+            'dataToSend': {}
+        }
 client = pymongo.MongoClient('mongodb://localhost:27017/')
 db = client['mydatabase']  # Replace 'mydatabase' with your database name
-collection = db['config']  # Create or get collection named 'config'
-
-# Insert data into the collection
-collection.insert_one(data)
-
-# Retrieve data from the collection
-result = collection.find_one()
-print(result)
+collection = db['tests']  # Create or get collection named 'config'
+collection.insert_one(formatted_test)
