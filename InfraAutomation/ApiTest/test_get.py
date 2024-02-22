@@ -16,67 +16,19 @@ sys.path.append(directory.parent.parent)
 import Data.GetData
 from Data.GetData import VarData, data
 
-class PageOutputDTO:
-    def __init__(self, page):
-        self.result = {"page": page}
-    def to_json(self):
-        return self.data
-
-def test_baba():
-    url = Data.GetData.loaded_data[VarData.BaseApiUrl] +"users?page=2"
-    headers = Data.GetData.get_headers()
-    response = requests.get(url, headers=headers)
-    assert response.status_code == 200
-    
-    response_data = response.json()
-    output_dto = PageOutputDTO(response_data['page'])
-    assert output_dto.result['page']==2
+client = pymongo.MongoClient('mongodb://localhost:27017/')
+db = client['mydatabase']
+db_config =  db['config']
+db_config = db_config.find_one()
+db_tests = db['tests'] 
 
 from flask_cors import CORS
 from flask import Flask, request, jsonify
-
-app = Flask(__name__)
-CORS(app)  # Add this line to enable CORS for all routes
-
-@app.route('/execute', methods=['POST'])
-def test_request():
-    try:
-        request_data = request.json
-        # Perform checks on the request data
-        endpoint = request_data['endpoint']
-        expected_status = request_data['expectedStatus']
-        expected_response_data = request_data['expectedData']
-        url = Data.GetData.loaded_data[VarData.BaseApiUrl] + endpoint
-        headers = Data.GetData.get_headers()
-        response = requests.get(url, headers=headers, verify=False)
-        response_data = response.json()
-        if not expected_status:
-            expected_status = 200
-        if not response.status_code == int(expected_status):
-            return jsonify({'error': 'expected_status is not the return status'})
-        for key,val in expected_response_data.items():
-            if not key in response_data:
-                return jsonify({'error': 'expected key is not the return data'})
-            if not val == "":
-                output_dto = PageOutputDTO(response_data[key])
-                if not str(output_dto.result[key])==val:
-                    return jsonify({'error': 'expected val is not the return data'})
-        return jsonify({'success': 'the get test is success'})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-# backend.py
-
-
-
-# Function to retrieve tests from the database and format them
+# Get test table 
 def get_tests():
-    client = pymongo.MongoClient('mongodb://localhost:27017/')
-    db = client['mydatabase']  # Replace 'mydatabase' with your database name
-    tests = db['tests']  # Create or get collection named 'config'
-    tests = tests.find({})
+    test_table = db_tests.find({})
     formatted_tests = []
-    for test in tests:
+    for test in test_table:
         formatted_test = {
             'id': str(test['_id']),
             'name': test['testName'],
@@ -89,7 +41,39 @@ def get_tests():
         formatted_tests.append(formatted_test)
     return formatted_tests
 
-# Route to retrieve tests
+app = Flask(__name__)
+CORS(app)
+@app.route('/execute', methods=['POST'])
+def execute_new_test():
+    return test_request(request.json)
+    
+def test_request(request_data):
+    try:
+        # Perform checks on the request data
+        endpoint = request_data['endpoint']
+        expected_status = request_data['expectedStatus']
+        expected_response_data = request_data['expectedData']
+        url = db_config["API"]["BaseApiUrl"] + endpoint
+        headers = db_config["API"]["Headers"]
+        response = requests.get(url, headers=headers, verify=False)
+        response_data = response.json()
+        if not expected_status:
+            expected_status = 200
+        if not response.status_code == int(expected_status):
+            return jsonify({'error': f'The expected status is:{expected_status}, the response status code is: {response.status_code}'}), 500
+        
+        for key,val in expected_response_data.items():
+            if not key in response_data:
+                return jsonify({'error': 'expected key is not the return data'})
+            if not val == "":
+                if not str(response_data[key])==val:
+                    return jsonify({'error': f'expected val {val}is not the return data{response_data[key]}'})
+        return jsonify({'success': 'the get test is success'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# backend.py
+# Rout test data  from db
 @app.route('/tests', methods=['GET'])
 def get_tests_route():
     tests = get_tests()
@@ -99,57 +83,22 @@ def get_tests_route():
 @app.route('/create_test', methods=['POST'])
 def create_test():
     data = request.json
-    client = pymongo.MongoClient('mongodb://localhost:27017/')
-    db = client['mydatabase']  # Replace 'mydatabase' with your database name
-    tests = db['tests']  # Create or get collection named 'config'
-    tests.insert_one(data)
+    db_tests.insert_one(data)
     return jsonify({'message': 'Test created successfully'}), 201
 
-def test_request(test):
-    try:
-        request_data = test
-        # Perform checks on the request data
-        endpoint = request_data['endpoint']
-        expected_status = request_data['expectedStatus']
-        expected_response_data = request_data['expectedData']
-        url = Data.GetData.loaded_data[VarData.BaseApiUrl] + endpoint
-        headers = Data.GetData.get_headers()
-        response = requests.get(url, headers=headers, verify=False)
-        response_data = response.json()
-        if not expected_status:
-            expected_status = 200
-        if not response.status_code == int(expected_status):
-            return jsonify({'error': 'expected_status is not the return status'}), 500
-        for key,val in expected_response_data.items():
-            if not key in response_data:
-                return jsonify({'error': 'expected key is not the return data'}), 500
-            if not val == "":
-                output_dto = PageOutputDTO(response_data[key])
-                if not str(output_dto.result[key])==val:
-                    return jsonify({'error': 'expected val is not the return data'}), 500
-        return jsonify({'success': 'the get test is success'})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
-# Route to execute a test
+
+
+# Route id from user and send request data
 @app.route('/tests/<test_id>/execute', methods=['POST'])
 def execute_test(test_id):
-    client = pymongo.MongoClient('mongodb://localhost:27017/')
-    db = client['mydatabase']  # Replace 'mydatabase' with your database name
-    tests = db['tests']  # Create or get collection named 'config'
-    tests = tests.find_one({'_id': ObjectId(test_id)})
+    tests = db_tests.find_one({'_id': ObjectId(test_id)})
     return test_request(tests)
-    # Logic to execute the test based on test_id
-    # This could involve sending requests to external APIs or performing actions
-    # For simplicity, let's just return a success message
-    # return jsonify({'message': f'Test with ID {test_id} executed successfully'})
-# Route to delete a test
+
+
 @app.route('/tests/<test_id>/delete', methods=['POST'])
 def delete_test(test_id):
-    client = pymongo.MongoClient('mongodb://localhost:27017/')
-    db = client['mydatabase']  # Replace 'mydatabase' with your database name
-    tests = db['tests']  # Create or get collection named 'config'
-    tests = tests.delete_one({'_id': ObjectId(test_id)})
+    tests = db_tests.delete_one({'_id': ObjectId(test_id)})
     return jsonify({'message': f'Test with ID {test_id} deleted successfully'})
 if __name__ == '__main__':
     app.run(debug=True)
